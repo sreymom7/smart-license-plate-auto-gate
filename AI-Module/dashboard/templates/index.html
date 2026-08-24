@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Checkpoint — Plate Access Console</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #272728;
+    --surface: #1f201f;
+    --surface-raised: #141A16;
+    --border: #212C25;
+    --border-soft: #1A2420;
+    --text: #EDF2EE;
+    --muted: #6F8079;
+    --faint: #445048;
+    --green: #16E68A;
+    --green-dim: #0E7A4C;
+    --red: #FF5A5A;
+    --amber: #FFB648;
+    --plate-bg: #F2EFE4;
+    --plate-text: #14201A;
+    --plate-border: #8A9186;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* ambient scanline texture, subtle */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px,
+      transparent 1px, transparent 3px
+    );
+    z-index: 0;
+  }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 28px 90px; position: relative; z-index: 1; }
+
+  /* ================= HEADER ================= */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 26px;
+    flex-wrap: wrap;
+    gap: 18px;
+  }
+
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark {
+    width: 36px; height: 36px;
+    border: 1.5px solid var(--green);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700; font-size: 15px;
+    color: var(--green);
+    box-shadow: 0 0 14px rgba(22,230,138,0.15) inset;
+  }
+  .brand-text .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .brand-text h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 21px; font-weight: 600; margin: 2px 0 0; letter-spacing: -0.01em;
+  }
+
+  /* live clock / date strip */
+  .live-tag {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px; color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+  .live-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  /* ================= GATE HERO ================= */
+  .hero {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 20px;
+    margin-bottom: 22px;
+  }
+  @media (max-width: 900px) { .hero { grid-template-columns: 1fr; } }
+
+  .gate-hero {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 26px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+  }
+  .gate-hero.state-open { border-color: var(--green-dim); }
+
+  .gate-hero-text .label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+  }
+  .gate-hero-text .value {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 40px; font-weight: 700; margin-top: 6px; letter-spacing: -0.01em;
+    color: var(--red); transition: color 0.4s ease;
+  }
+  .gate-hero-text .value.open { color: var(--green); }
+  .gate-hero-text .sub { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+
+  /* barrier graphic */
+  .rail { position: relative; width: 130px; height: 74px; flex-shrink: 0; }
+  .rail-base { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 100px; height: 5px; background: var(--border); border-radius: 3px; }
+  .rail-post { position: absolute; bottom: 5px; left: 10px; width: 9px; height: 62px; background: linear-gradient(var(--border-soft), var(--border)); border-radius: 3px; }
+  .rail-arm {
+    position: absolute; left: 15px; bottom: 58px;
+    width: 108px; height: 9px;
+    background: repeating-linear-gradient(45deg, var(--red) 0 10px, #fff2 10px 11px, var(--red) 11px 21px);
+    border-radius: 4px;
+    transform-origin: left center;
+    transform: rotate(0deg);
+    transition: transform 0.7s cubic-bezier(.34,1.5,.4,1), filter 0.4s ease;
+  }
+  .rail-arm.open {
+    transform: rotate(-78deg);
+    filter: hue-rotate(140deg) brightness(1.3);
+  }
+
+  /* stat readout card */
+  .stat-strip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px 24px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+  .stat { border-left: 1px solid var(--border-soft); padding-left: 16px; }
+  .stat:first-child { border-left: none; padding-left: 0; }
+  .stat .n {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 26px; font-weight: 700;
+  }
+  .stat .n.green { color: var(--green); }
+  .stat .n.red { color: var(--red); }
+  .stat .l { font-size: 11px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.05em; margin-top: 3px; }
+
+  /* ================= LAYOUT GRID ================= */
+  .grid { display: grid; grid-template-columns: 1.55fr 1fr; gap: 20px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px;
+  }
+  .panel-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 16px;
+  }
+  .panel h2 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted); margin: 0; font-weight: 500;
+  }
+  .panel-note { font-size: 11px; color: var(--faint); font-family: 'IBM Plex Mono', monospace; }
+
+  /* ---------- log table ---------- */
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th {
+    text-align: left; font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px; letter-spacing: 0.06em; color: var(--faint);
+    padding: 0 10px 10px; font-weight: 500; text-transform: uppercase;
+  }
+  td { padding: 10px; border-top: 1px solid var(--border-soft); font-family: 'IBM Plex Mono', monospace; vertical-align: middle; }
+  tr:hover td { background: rgba(255,255,255,0.012); }
+  .plate-cell { letter-spacing: 0.02em; font-weight: 600; }
+  .status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 7px; border-radius: 20px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.03em; }
+  .status-pill::before { content: ""; width: 5px; height: 5px; border-radius: 50%; }
+  .status-pill.AUTHORIZED { background: rgba(22,230,138,0.1); color: var(--green); }
+  .status-pill.AUTHORIZED::before { background: var(--green); }
+  .status-pill.DENIED { background: rgba(255,90,90,0.1); color: var(--red); }
+  .status-pill.DENIED::before { background: var(--red); }
+  .empty-row td { color: var(--muted); font-family: 'IBM Plex Sans'; text-align: center; padding: 34px; border-top: none; }
+
+  /* ---------- simulate scan ---------- */
+  .sim-box { margin-top: 20px; padding-top: 20px; border-top: 1px dashed var(--border); }
+  .sim-row { display: flex; gap: 8px; }
+  .sim-row input {
+    flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    padding: 10px 12px; border-radius: 7px; font-family: 'IBM Plex Mono', monospace;
+    letter-spacing: 0.04em; font-size: 13px;
+  }
+  .sim-row input:focus { outline: none; border-color: var(--amber); }
+  .sim-row button {
+    background: var(--amber); color: #241900; border: none; font-weight: 600;
+    padding: 0 18px; border-radius: 7px; cursor: pointer; font-size: 13px; font-family: 'IBM Plex Sans';
+  }
+  .sim-row button:hover { filter: brightness(1.08); }
+  #simResult { margin-top: 12px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); min-height: 16px; }
+
+  /* ---------- whitelist as physical plate chips ---------- */
+  .plate-list { display: flex; flex-direction: column; gap: 10px; }
+  .plate-chip {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface-raised); border: 1px solid var(--border-soft);
+    border-radius: 9px; padding: 10px 12px;
+  }
+  .plate-chip.inactive { opacity: 0.42; }
+  .plate-graphic {
+    flex-shrink: 0;
+    background: var(--plate-bg);
+    color: var(--plate-text);
+    border: 2px solid var(--plate-border);
+    border-radius: 4px;
+    padding: 5px 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700; font-size: 13px; letter-spacing: 0.04em;
+    min-width: 84px; text-align: center;
+  }
+  .plate-meta { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+  .plate-meta .owner { font-size: 13px; font-weight: 600; }
+  .plate-meta .vehicle { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .del-btn {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    border-radius: 6px; padding: 5px 9px; font-size: 11px; cursor: pointer; flex-shrink: 0;
+  }
+  .del-btn:hover { border-color: var(--red); color: var(--red); }
+
+  .add-form { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .add-form input {
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    padding: 9px 11px; border-radius: 7px; font-size: 13px;
+  }
+  .add-form input:focus { outline: none; border-color: var(--green); }
+  .add-form button {
+    grid-column: span 2; background: var(--green); color: #06110C; border: none;
+    font-weight: 600; padding: 10px 0; border-radius: 7px; cursor: pointer;
+    font-size: 13px; letter-spacing: 0.02em; margin-top: 2px;
+  }
+  .add-form button:hover { filter: brightness(1.08); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="brand-mark">CP</div>
+      <div class="brand-text">
+        <div class="eyebrow">Smart Plate Recognition</div>
+        <h1>Checkpoint</h1>
+      </div>
+    </div>
+    <div class="live-tag"><span class="live-dot"></span> LIVE · POLLING EVERY 3s</div>
+  </header>
+
+  <div class="hero">
+    <div class="gate-hero" id="gateHero">
+      <div class="gate-hero-text">
+        <div class="label">Gate status</div>
+        <div class="value {{ 'open' if gate_open else '' }}" id="gateValue">{{ 'OPEN' if gate_open else 'CLOSED' }}</div>
+        <div class="sub">simulated actuator · auto-closes on timer</div>
+      </div>
+      <div class="rail">
+        <div class="rail-post"></div>
+        <div class="rail-arm {{ 'open' if gate_open else '' }}" id="railArm"></div>
+        <div class="rail-base"></div>
+      </div>
+    </div>
+
+    <div class="stat-strip">
+      <div class="stat">
+        <div class="n" id="statTotal">{{ logs|length }}</div>
+        <div class="l">Attempts logged</div>
+      </div>
+      <div class="stat">
+        <div class="n green" id="statAuth">{{ logs|selectattr("status","equalto","AUTHORIZED")|list|length }}</div>
+        <div class="l">Authorized</div>
+      </div>
+      <div class="stat">
+        <div class="n red" id="statDenied">{{ logs|selectattr("status","equalto","DENIED")|list|length }}</div>
+        <div class="l">Denied</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <!-- LOGS -->
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Access Log</h2>
+        <span class="panel-note">most recent 50</span>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Time</th><th>Detected</th><th>Owner</th><th>Status</th><th>Gate</th></tr>
+        </thead>
+        <tbody id="logBody">
+          {% for row in logs %}
+          <tr>
+            <td>{{ row.timestamp }}</td>
+            <td class="plate-cell">{{ row.plate_detected }}</td>
+            <td>{{ row.owner or "—" }}</td>
+            <td><span class="status-pill {{ row.status }}">{{ row.status }}</span></td>
+            <td>{{ row.gate_action }}</td>
+          </tr>
+          {% else %}
+          <tr class="empty-row"><td colspan="5">No access attempts logged yet. Try a simulated scan below.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="sim-box">
+        <h2 style="margin-bottom:12px;">Live Camera (real detection + OCR)</h2>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <button onclick="startCamera()" id="startCamBtn">Start Camera</button>
+          <button onclick="stopCamera()" id="stopCamBtn" style="background:var(--border);color:var(--text);" disabled>Stop</button>
+          <button onclick="captureAndScan()" id="captureBtn" disabled>Capture &amp; Scan</button>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-left:4px;">
+            <input type="checkbox" id="autoScanToggle" onchange="toggleAutoScan()"> Auto-scan every 3s
+          </label>
+        </div>
+        <video id="camVideo" autoplay playsinline style="width:100%;max-width:480px;border-radius:8px;border:1px solid var(--border);display:none;"></video>
+        <canvas id="camCanvas" style="display:none;"></canvas>
+        <div id="camResult"></div>
+        <img id="camAnnotatedPreview" style="display:none;max-width:100%;margin-top:12px;border-radius:8px;border:1px solid var(--border);">
+      </div>
+
+      <div class="sim-box">
+        <h2 style="margin-bottom:12px;">Scan a Photo (real detection + OCR)</h2>
+        <div class="sim-row">
+          <input type="file" id="imageFile" accept="image/*" style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 11px;border-radius:7px;font-size:12.5px;">
+          <button onclick="scanImage()" id="scanImageBtn">Scan Image</button>
+        </div>
+        <div id="scanImageResult"></div>
+        <img id="annotatedPreview" style="display:none;max-width:100%;margin-top:12px;border-radius:8px;border:1px solid var(--border);">
+      </div>
+
+      <div class="sim-box">
+        <h2 style="margin-bottom:12px;">Simulate Scan (type plate text)</h2>
+        <div class="sim-row">
+          <input id="simPlate" placeholder="e.g. 2A-1234" autocomplete="off">
+          <button onclick="simulateScan()">Scan</button>
+        </div>
+        <div id="simResult"></div>
+      </div>
+    </div>
+
+    <!-- WHITELIST -->
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Authorized Plates</h2>
+        <span class="panel-note">{{ plates|length }} on file</span>
+      </div>
+      <div class="plate-list" id="plateList">
+        {% for p in plates %}
+        <div class="plate-chip {{ 'inactive' if not p.active }}" data-plate="{{ p.plate }}">
+          <div class="plate-graphic">{{ p.plate }}</div>
+          <div class="plate-meta">
+            <span class="owner">{{ p.owner }}</span>
+            <span class="vehicle">{{ p.vehicle }}{% if not p.active %} · inactive{% endif %}</span>
+          </div>
+          <button class="del-btn" onclick="deletePlate('{{ p.plate }}')">Remove</button>
+        </div>
+        {% endfor %}
+      </div>
+
+      <form class="add-form" onsubmit="addPlate(event)">
+        <input id="newPlate" placeholder="Plate no." required>
+        <input id="newOwner" placeholder="Owner name">
+        <input id="newVehicle" placeholder="Vehicle (optional)" style="grid-column: span 2;">
+        <button type="submit">Add to whitelist</button>
+      </form>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function setGateUI(open) {
+  document.getElementById('railArm').classList.toggle('open', open);
+  const v = document.getElementById('gateValue');
+  v.textContent = open ? 'OPEN' : 'CLOSED';
+  v.classList.toggle('open', open);
+  document.getElementById('gateHero').classList.toggle('state-open', open);
+}
+
+function renderLogs(logs) {
+  const body = document.getElementById('logBody');
+  if (!logs.length) {
+    body.innerHTML = '<tr class="empty-row"><td colspan="5">No access attempts logged yet. Try a simulated scan below.</td></tr>';
+  } else {
+    body.innerHTML = logs.map(r => `
+      <tr>
+        <td>${r.timestamp}</td>
+        <td class="plate-cell">${r.plate_detected}</td>
+        <td>${r.owner || '—'}</td>
+        <td><span class="status-pill ${r.status}">${r.status}</span></td>
+        <td>${r.gate_action}</td>
+      </tr>
+    `).join('');
+  }
+  document.getElementById('statTotal').textContent = logs.length;
+  document.getElementById('statAuth').textContent = logs.filter(r => r.status === 'AUTHORIZED').length;
+  document.getElementById('statDenied').textContent = logs.filter(r => r.status === 'DENIED').length;
+}
+
+async function pollStatus() {
+  try {
+    const res = await fetch('/api/status');
+    const data = await res.json();
+    setGateUI(data.gate_open);
+    renderLogs(data.logs);
+  } catch (e) { /* server may be restarting */ }
+}
+setInterval(pollStatus, 3000);
+
+async function simulateScan() {
+  const plate = document.getElementById('simPlate').value.trim();
+  const resultEl = document.getElementById('simResult');
+  if (!plate) return;
+
+  resultEl.textContent = 'Scanning...';
+  const res = await fetch('/api/simulate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plate })
+  });
+  const data = await res.json();
+
+  if (!data.success) {
+    resultEl.textContent = 'Error: ' + (data.error || 'unknown');
+    return;
+  }
+
+  resultEl.textContent = `${data.status} — match score ${data.match_score} — gate: ${data.gate_action}`;
+  setGateUI(data.gate_open);
+  pollStatus();
+}
+
+// ---------- shared scan logic (used by both camera + file upload) ----------
+async function scanBlob(blob, resultEl, previewEl) {
+  const formData = new FormData();
+  formData.append('image', blob, 'frame.jpg');
+
+  resultEl.textContent = 'Running detection + OCR...';
+
+  try {
+    const res = await fetch('/api/scan_image', { method: 'POST', body: formData });
+    const data = await res.json();
+
+    if (!data.success) {
+      resultEl.textContent = 'Error: ' + data.error;
+      return;
+    }
+
+    if (data.annotated_image) {
+      previewEl.src = 'data:image/jpeg;base64,' + data.annotated_image;
+      previewEl.style.display = 'block';
+    }
+
+    if (!data.detections.length) {
+      resultEl.textContent = data.message || 'No plate detected.';
+    } else {
+      resultEl.innerHTML = data.detections.map(d => {
+        if (d.status === 'UNREADABLE') {
+          return `Detected a plate region but couldn't read the text (detector conf ${d.detector_confidence})`;
+        }
+        return `<span class="status-pill ${d.status}">${d.status}</span> ${d.plate_text} — gate: ${d.gate_action}`;
+      }).join('<br>');
+    }
+
+    setGateUI(data.gate_open);
+    pollStatus();
+  } catch (e) {
+    resultEl.textContent = 'Request failed: ' + e;
+  }
+}
+
+// ---------- live camera ----------
+let camStream = null;
+let autoScanInterval = null;
+
+async function startCamera() {
+  const video = document.getElementById('camVideo');
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+  } catch (e) {
+    document.getElementById('camResult').textContent =
+      'Could not access camera: ' + e.message + ' (allow camera permission, and use http://localhost, not a file:// path)';
+    return;
+  }
+  video.srcObject = camStream;
+  video.style.display = 'block';
+  document.getElementById('startCamBtn').disabled = true;
+  document.getElementById('stopCamBtn').disabled = false;
+  document.getElementById('captureBtn').disabled = false;
+}
+
+function stopCamera() {
+  if (camStream) {
+    camStream.getTracks().forEach(t => t.stop());
+    camStream = null;
+  }
+  document.getElementById('camVideo').style.display = 'none';
+  document.getElementById('startCamBtn').disabled = false;
+  document.getElementById('stopCamBtn').disabled = true;
+  document.getElementById('captureBtn').disabled = true;
+  document.getElementById('autoScanToggle').checked = false;
+  if (autoScanInterval) { clearInterval(autoScanInterval); autoScanInterval = null; }
+}
+
+function captureAndScan() {
+  const video = document.getElementById('camVideo');
+  const canvas = document.getElementById('camCanvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+
+  canvas.toBlob(blob => {
+    scanBlob(blob, document.getElementById('camResult'), document.getElementById('camAnnotatedPreview'));
+  }, 'image/jpeg', 0.9);
+}
+
+function toggleAutoScan() {
+  const on = document.getElementById('autoScanToggle').checked;
+  if (autoScanInterval) { clearInterval(autoScanInterval); autoScanInterval = null; }
+  if (on && camStream) {
+    autoScanInterval = setInterval(captureAndScan, 3000);
+  }
+}
+
+async function scanImage() {
+  const fileInput = document.getElementById('imageFile');
+  const resultEl = document.getElementById('scanImageResult');
+  const preview = document.getElementById('annotatedPreview');
+  const btn = document.getElementById('scanImageBtn');
+
+  if (!fileInput.files.length) {
+    resultEl.textContent = 'Choose an image first.';
+    return;
+  }
+
+  btn.disabled = true;
+  preview.style.display = 'none';
+  await scanBlob(fileInput.files[0], resultEl, preview);
+  btn.disabled = false;
+}
+
+async function addPlate(e) {
+  e.preventDefault();
+  const plate = document.getElementById('newPlate').value.trim();
+  const owner = document.getElementById('newOwner').value.trim();
+  const vehicle = document.getElementById('newVehicle').value.trim();
+  if (!plate) return;
+
+  await fetch('/api/plates/add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plate, owner, vehicle, active: true })
+  });
+  location.reload();
+}
+
+async function deletePlate(plate) {
+  await fetch('/api/plates/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plate })
+  });
+  location.reload();
+}
+</script>
+</body>
+</html>
