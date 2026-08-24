@@ -1,0 +1,5 @@
+1. Download mobules
+    pip install -r requirements.txt // pip3 for mac os
+
+2. Start project 
+    python main.py // python3 for mac os
