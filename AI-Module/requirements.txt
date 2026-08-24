@@ -1,0 +1,9 @@
+ultralytics
+easyocr
+opencv-python
+numpy
+flask
+json
+cv2
+os
+difflib
