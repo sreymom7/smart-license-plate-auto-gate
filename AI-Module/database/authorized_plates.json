@@ -1,0 +1,26 @@
+[
+  {
+    "plate": "2A-1234",
+    "owner": "Sok Dara",
+    "vehicle": "Toyota Camry",
+    "active": true
+  },
+  {
+    "plate": "1B-5678",
+    "owner": "Chan Malis",
+    "vehicle": "Honda Civic",
+    "active": true
+  },
+  {
+    "plate": "3KH-9001",
+    "owner": "Visitor Pass - Front Desk",
+    "vehicle": "Any",
+    "active": false
+  },
+  {
+    "plate": "2BK-4454",
+    "owner": "sreymom",
+    "vehicle": "",
+    "active": true
+  }
+]
