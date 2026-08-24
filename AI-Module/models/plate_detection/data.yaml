@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['LicensePlate']
+
+roboflow:
+  workspace: haeun-kim-ri91b
+  project: license-plate-detection-wienp
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/haeun-kim-ri91b/license-plate-detection-wienp/dataset/1
