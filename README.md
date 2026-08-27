@@ -1,11 +1,6 @@
 ﻿# smart-license-plate-auto-gate
 
-## Project Information
 
-- **Student:** Chhan sreymom,Choeun Socheata
-- **Course:** Machine Learning
-- **Lecturer:** HIM SOKLONG
-- **Problem Type:** Classification
 
 ## Project Overview
 
